@@ -1,0 +1,461 @@
+// By 3dWrecker 
+
+// Ford cylinder numbering convention from front left 1-2-3-4, from front right 5-6-7-8 
+// Ford Voodoo firing order 1-5-4-8-3-7-2-6
+
+// References
+
+// Horsepower/Torque Curve 2019 Shelby Mustang GT350 (man. 6) (model since mid-year 2018 for North America ). Detailed engine characteristics.
+// https://www.automobile-catalog.com/curve/2019/2916185/shelby_mustang_gt350.html
+
+// Manley 14043R-8 H-Beam Connecting Rods 4340 Forged - ARP 2000 Cap Screws (5.2L DOHC Coyote / Voodoo)
+// $1,079.22
+// https://www.lethalperformance.com/manley-14043r-8-h-beam-connecting-rods-4340-forged-arp-2000-cap-screws-5-2l-dohc-coyote-voodoo.html
+
+// shelby-gt350-voodoo-v8-aftermarket-upgrades-now-include-mahle-forged-pistons-160573.pdf
+// https://www.autoevolution.com/pdf/news_attachements/shelby-gt350-voodoo-v8-aftermarket-upgrades-now-include-mahle-forged-pistons-160573.pdf
+
+// LM-GT3F-1 Camshaft Set GT350 5.2L Voodoo W/180 deg Flat Plane Crank Any N/A or Forced Induction Full TiVCT
+// $1,998.00
+// https://lmengines.com/collections/gt350-camshafts/products/lm-gt3f-1-br-gt350-5-2l-voodoo-w-180-deg-flat-plane-crank-br-b-any-n-a-or-forced-induction-br-full-tivct-b
+
+// Ford Performance Parts Gen 2 Coyote Cylinder Heads M-6050-M52X
+// $1,309.99
+// https://www.summitracing.com/parts/fms-m-6050-m52x/make/ford/model/mustang/submodel/shelby-gt350#overview
+
+// 2020FPPcatalog.pdf
+// https://performanceparts.ford.com/download/PDFS/2020FPPcatalog.pdf
+
+import "engine_sim.mr"
+
+units units()
+constants constants()
+impulse_response_library ir_lib()
+
+label cycle(2 * 360 * units.deg)
+//label ign_offset(-20 * units.deg)
+
+public node ford_voodoo_distributor {
+    input wires;
+    input timing_curve;
+    input rev_limit: 8250 * units.rpm;
+    input limiter_duration: 0.03;
+    alias output __out:
+        ignition_module(timing_curve: timing_curve, rev_limit: rev_limit, limiter_duration: limiter_duration)
+            .connect_wire(wires.wire1, (0.0 / 8.0) * cycle)
+            .connect_wire(wires.wire5, (1.0 / 8.0) * cycle)
+            .connect_wire(wires.wire4, (2.0 / 8.0) * cycle)
+            .connect_wire(wires.wire8, (3.0 / 8.0) * cycle)
+            .connect_wire(wires.wire3, (4.0 / 8.0) * cycle)
+            .connect_wire(wires.wire7, (5.0 / 8.0) * cycle)
+            .connect_wire(wires.wire2, (6.0 / 8.0) * cycle)
+            .connect_wire(wires.wire6, (7.0 / 8.0) * cycle);
+}
+
+public node voodoo_lm_gt3f_1_intake_profile {
+    alias output __out:
+        harmonic_cam_lobe(
+            duration_at_50_thou: 234 * units.deg,
+            gamma: 1.0,
+            lift: 551 * units.thou,
+            steps: 100
+        );
+}
+
+public node voodoo_lm_gt3f_1_exhaust_profile {
+    alias output __out:
+        harmonic_cam_lobe(
+            duration_at_50_thou: 235 * units.deg,
+            gamma: 1.0,
+            lift: 551 * units.thou,
+            steps: 100
+        );
+}
+
+public node flatplane_v8_camshaft_builder {
+    input intake_lobe_profile: voodoo_lm_gt3f_1_intake_profile();
+    input exhaust_lobe_profile: voodoo_lm_gt3f_1_exhaust_profile();
+    input lobe_separation: 120.5 * units.deg;
+    input intake_lobe_center: lobe_separation/2;
+    input exhaust_lobe_center: lobe_separation/2;
+    input advance: 0.0 * units.deg;
+    input base_radius: 1 * units.inch;
+
+    output intake_cam_0: _intake_cam_0;
+    output intake_cam_1: _intake_cam_1;
+    output exhaust_cam_0: _exhaust_cam_0;
+    output exhaust_cam_1: _exhaust_cam_1;
+
+    camshaft_parameters params(
+        advance: advance,
+        base_radius: base_radius
+    )
+
+    camshaft _intake_cam_0(params, lobe_profile: intake_lobe_profile)
+    camshaft _intake_cam_1(params, lobe_profile: intake_lobe_profile)
+    camshaft _exhaust_cam_0(params, lobe_profile: exhaust_lobe_profile)
+    camshaft _exhaust_cam_1(params, lobe_profile: exhaust_lobe_profile)
+
+    label rot90(90 * units.deg)
+    label rot360(360 * units.deg)
+
+    _exhaust_cam_0
+        .add_lobe(rot360 - exhaust_lobe_center)
+        .add_lobe(rot360 - exhaust_lobe_center + 6 * rot90)
+        .add_lobe(rot360 - exhaust_lobe_center + 4 * rot90)
+        .add_lobe(rot360 - exhaust_lobe_center + 2 * rot90)
+
+    _exhaust_cam_1
+        .add_lobe(rot360 - exhaust_lobe_center + 1 * rot90)
+        .add_lobe(rot360 - exhaust_lobe_center + 7 * rot90)
+        .add_lobe(rot360 - exhaust_lobe_center + 5 * rot90)
+        .add_lobe(rot360 - exhaust_lobe_center + 3 * rot90)
+
+    _intake_cam_0
+        .add_lobe(rot90 + rot360 + intake_lobe_center)
+        .add_lobe(rot90 + rot360 + intake_lobe_center + 6 * rot90)
+        .add_lobe(rot90 + rot360 + intake_lobe_center + 4 * rot90)
+        .add_lobe(rot90 + rot360 + intake_lobe_center + 2 * rot90)
+
+    _intake_cam_1
+        .add_lobe(rot90 + rot360 + intake_lobe_center + 1 * rot90)
+        .add_lobe(rot90 + rot360 + intake_lobe_center + 7 * rot90)
+        .add_lobe(rot90 + rot360 + intake_lobe_center + 5 * rot90)
+        .add_lobe(rot90 + rot360 + intake_lobe_center + 3 * rot90)
+}
+
+public node voodoo_lm_gt3f_1_cam {
+    alias output __out:
+        flatplane_v8_camshaft_builder(
+            advance: -57 * units.deg,
+            base_radius: 750.0 * units.thou);
+}
+
+public node ford_gt350_intake {
+    input carburetor_cfm: 1000;
+    input idle_flow_rate_cfm: 1.0;
+    input idle_throttle_plate_position: 0.90;
+
+    alias output __out: intake;
+
+    intake intake(
+        plenum_volume: 11 * units.L,
+        plenum_cross_section_area: 88.75 * units.cm2,
+        intake_flow_rate: k_carb(carburetor_cfm),
+        idle_flow_rate: k_carb(idle_flow_rate_cfm),
+        idle_throttle_plate_position: idle_throttle_plate_position,
+        runner_flow_rate: k_carb(400),
+        runner_length: 410 * units.mm,
+        velocity_decay: 0.1
+    )
+}
+
+public node ford_voodoo_head {
+    input intake_camshaft;
+    input exhaust_camshaft;
+    input flip_display: false;
+    alias output __out: head;
+
+    function intake_flow(100 * units.thou)
+    intake_flow
+        .add_flow_sample(0, 0)
+        .add_flow_sample(100, 45)
+        .add_flow_sample(200, 159)
+        .add_flow_sample(300, 244.2)
+        .add_flow_sample(400, 294.6)
+        .add_flow_sample(500, 328.2)
+        .add_flow_sample(600, 339)
+
+    function exhaust_flow(100 * units.thou)
+    exhaust_flow
+        .add_flow_sample(0, 0)
+        .add_flow_sample(100, 31.48)
+        .add_flow_sample(200, 151.16)
+        .add_flow_sample(300, 204.2)
+        .add_flow_sample(400, 224.6)
+        .add_flow_sample(500, 236.84)
+        .add_flow_sample(600, 245)
+
+    cylinder_head head(
+        chamber_volume: 53.5 * units.cc,
+        intake_runner_volume: 209 * units.cc,
+        intake_runner_cross_section_area: 88.75 * units.cm2,
+
+        exhaust_runner_volume: 92 * units.cc,
+        exhaust_runner_cross_section_area: 94 * units.cm2,
+
+        intake_port_flow: intake_flow,
+        exhaust_port_flow: exhaust_flow,
+        intake_camshaft: intake_camshaft,
+        exhaust_camshaft: exhaust_camshaft,
+        flip_display: flip_display
+    )
+}
+
+private node wires {
+    output wire1: ignition_wire();
+    output wire2: ignition_wire();
+    output wire3: ignition_wire();
+    output wire4: ignition_wire();
+    output wire5: ignition_wire();
+    output wire6: ignition_wire();
+    output wire7: ignition_wire();
+    output wire8: ignition_wire();
+}
+
+public node ford_voodoo {
+    alias output __out: engine;
+
+    wires wires()
+
+    engine engine(
+        name: "Ford GT350 Voodoo",
+        starter_torque: 400 * units.lb_ft,
+        redline: 8250 * units.rpm,
+        fuel: fuel(
+            max_turbulence_effect: 3.0,
+            burning_efficiency_randomness: 0.03,
+            max_burning_efficiency: 0.9),
+        throttle_gamma: 1.5 //,
+//        throttle: governor(
+//            min_speed: 950.0 * units.rpm,
+//            max_speed: 8250.0 * units.rpm,
+//            min_v: -20.0,
+//            max_v: 20.0,
+//            k_s: 0.0001,
+//            k_d: 0.01,
+//            gamma: 1.5)
+    )
+
+    crankshaft c0(
+        throw: 1830.5 * units.thou,
+        flywheel_mass: 22 * units.lb,
+        mass: 48 * units.lb,
+        friction_torque: 10.0 * units.lb_ft,
+        moment_of_inertia: 0.285,
+        position_x: 0.0,
+        position_y: 0.0,
+        tdc: 135 * units.deg
+    )
+
+    rod_journal rj0(angle: 0.0)
+    rod_journal rj1(angle: constants.pi)
+    rod_journal rj2(angle: 0.0)
+    rod_journal rj3(angle: constants.pi)
+
+    c0
+        .add_rod_journal(rj0)
+        .add_rod_journal(rj1)
+        .add_rod_journal(rj2)
+        .add_rod_journal(rj3)    
+
+    piston_parameters piston_params(
+        mass: 380 * units.g,
+        blowby: 0,
+        compression_height: 1161 * units.thou,
+        wrist_pin_position: 0.0,
+        displacement: 7.8 * units.cc
+    )
+
+    connecting_rod_parameters cr_params(
+        mass: 605 * units.g,
+        moment_of_inertia: 0.00158,
+        center_of_mass: 0.0,
+        length: 5933 * units.thou
+    )
+
+    cylinder_bank_parameters bank_params(
+        bore: 3701 * units.thou,
+        deck_height: (51 + 1830.5 + 5933 + 1161) * units.thou
+    )
+
+    ford_gt350_intake intake(
+        carburetor_cfm: 845,
+        idle_flow_rate_cfm: 1,
+        idle_throttle_plate_position: 0.9834
+    )
+
+    exhaust_system_parameters es0_params(
+        outlet_flow_rate: k_carb(800),
+        primary_tube_length: 13.33 * units.inch,
+        primary_flow_rate: k_carb(500),
+        velocity_decay: 0.2,
+        volume: 13.33 * units.L
+    )
+
+    exhaust_system_parameters es1_params(
+        outlet_flow_rate: k_carb(800),
+        primary_tube_length: 20 * units.inch,
+        primary_flow_rate: k_carb(500),
+        velocity_decay: 0.2,
+        volume: 20 * units.L
+    )
+
+    exhaust_system_parameters es2_params(
+        outlet_flow_rate: k_carb(1200),
+        primary_tube_length: 13.33 * units.inch,
+        primary_flow_rate: k_carb(500),
+        velocity_decay: 0.2,
+        volume: 13.33 * units.L
+    )
+
+    exhaust_system_parameters es3_params(
+        outlet_flow_rate: k_carb(800),
+        primary_tube_length: 20 * units.inch,
+        primary_flow_rate: k_carb(500),
+        velocity_decay: 0.2,
+        volume: 20 * units.L
+    )
+
+
+    exhaust_system exhaust0(es0_params, audio_volume: 1.0, impulse_response: ir_lib.saw_0)
+    exhaust_system exhaust1(es1_params, audio_volume: 1.0, impulse_response: ir_lib.saw_0)
+    exhaust_system exhaust2(es2_params, audio_volume: 1.0, impulse_response: ir_lib.saw_0)
+    exhaust_system exhaust3(es3_params, audio_volume: 1.0, impulse_response: ir_lib.saw_0)
+
+
+    cylinder_bank b0(bank_params, angle: 45 * units.deg)
+    b0
+        .add_cylinder(
+            piston: piston(piston_params, blowby: k_28inH2O(0.1)),
+            connecting_rod: connecting_rod(cr_params),
+            rod_journal: rj0,
+            intake: intake,
+            exhaust_system: exhaust0,
+            ignition_wire: wires.wire1,
+            sound_attenuation: 1.0
+        )
+        .add_cylinder(
+            piston: piston(piston_params, blowby: k_28inH2O(0.1)),
+            connecting_rod: connecting_rod(cr_params),
+            rod_journal: rj1,
+            intake: intake,
+            exhaust_system: exhaust0,
+            ignition_wire: wires.wire2,
+            sound_attenuation: 1.0
+        )
+        .add_cylinder(
+            piston: piston(piston_params, blowby: k_28inH2O(0.1)),
+            connecting_rod: connecting_rod(cr_params),
+            rod_journal: rj2,
+            intake: intake,
+            exhaust_system: exhaust1,
+            ignition_wire: wires.wire3,
+            sound_attenuation: 1.0
+        )
+        .add_cylinder(
+            piston: piston(piston_params, blowby: k_28inH2O(0.1)),
+            connecting_rod: connecting_rod(cr_params),
+            rod_journal: rj3,
+            intake: intake,
+            exhaust_system: exhaust1,
+            ignition_wire: wires.wire4,
+            sound_attenuation: 1.0
+        )
+
+    cylinder_bank b1(bank_params, angle: -45.0 * units.deg)
+    b1
+        .add_cylinder(
+            piston: piston(piston_params, blowby: k_28inH2O(0.1)),
+            connecting_rod: connecting_rod(cr_params),
+            rod_journal: rj0,
+            intake: intake,
+            exhaust_system: exhaust2,
+            ignition_wire: wires.wire5,
+            sound_attenuation: 1.0
+        )
+        .add_cylinder(
+            piston: piston(piston_params, blowby: k_28inH2O(0.1)),
+            connecting_rod: connecting_rod(cr_params),
+            rod_journal: rj1,
+            intake: intake,
+            exhaust_system: exhaust2,
+            ignition_wire: wires.wire6,
+            sound_attenuation: 1.0
+        )
+        .add_cylinder(
+            piston: piston(piston_params, blowby: k_28inH2O(0.1)),
+            connecting_rod: connecting_rod(cr_params),
+            rod_journal: rj2,
+            intake: intake,
+            exhaust_system: exhaust3,
+            ignition_wire: wires.wire7,
+            sound_attenuation: 1.0
+        )
+        .add_cylinder(
+            piston: piston(piston_params, blowby: k_28inH2O(0.1)),
+            connecting_rod: connecting_rod(cr_params),
+            rod_journal: rj3,
+            intake: intake,
+            exhaust_system: exhaust2,
+            ignition_wire: wires.wire8,
+            sound_attenuation: 1.0
+        )
+
+    engine
+        .add_cylinder_bank(b0)
+        .add_cylinder_bank(b1)
+
+    engine.add_crankshaft(c0)
+
+    voodoo_lm_gt3f_1_cam camshaft()
+
+    b0.set_cylinder_head (
+        ford_voodoo_head(
+            intake_camshaft: camshaft.intake_cam_0,
+            exhaust_camshaft: camshaft.exhaust_cam_0,
+            flip_display: true
+        )
+    )
+    b1.set_cylinder_head (
+        ford_voodoo_head(
+            intake_camshaft: camshaft.intake_cam_1,
+            exhaust_camshaft: camshaft.exhaust_cam_1
+        )
+    )
+
+    function timing_curve(1000 * units.rpm)
+    timing_curve
+        .add_sample(0000 * units.rpm, 15 * units.deg)
+        .add_sample(1000 * units.rpm, 20 * units.deg)
+        .add_sample(2000 * units.rpm, 30 * units.deg)
+        .add_sample(3000 * units.rpm, 35 * units.deg)
+        .add_sample(4000 * units.rpm, 40 * units.deg)
+        .add_sample(5000 * units.rpm, 45 * units.deg)
+        .add_sample(6000 * units.rpm, 50 * units.deg)
+        .add_sample(7000 * units.rpm, 55 * units.deg)
+        .add_sample(8000 * units.rpm, 55 * units.deg)
+        .add_sample(8000 * units.rpm, 50 * units.deg)
+
+    engine.add_ignition_module(
+        ford_voodoo_distributor(
+            wires: wires,
+            timing_curve: timing_curve,
+            rev_limit: 8250 * units.rpm,
+            limiter_duration: 0.03
+        )
+    )
+}
+
+public node ford_gt350 {
+	alias output __out: vehicle;
+	vehicle vehicle(
+		mass: 1706 * units.kg,
+		drag_coefficient: 0.38,
+		cross_sectional_area: 2.2 * units.m2,
+		diff_ratio: 3.73,
+		tire_radius: 696 * 0.5 * units.mm,
+		rolling_resistance: 2000
+		)
+}
+
+public node ford_gt350_transmission {
+    alias output __out:
+        transmission()
+            .add_gear(3.253)
+			.add_gear(2.233)
+			.add_gear(1.611)
+			.add_gear(1.243)
+			.add_gear(1)
+            .add_gear(0.629);
+}

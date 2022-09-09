@@ -1,0 +1,14 @@
+import "engine_sim.mr"
+import "themes/default.mr"
+import "engines/ford/ford_voodoo.mr"
+
+use_default_theme()
+set_engine(
+    ford_voodoo()
+)
+set_vehicle(
+    ford_gt350()
+)
+set_transmission(
+    ford_gt350_transmission()
+)
