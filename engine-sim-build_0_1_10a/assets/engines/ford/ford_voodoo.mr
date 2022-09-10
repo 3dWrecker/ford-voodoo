@@ -272,7 +272,7 @@ public node ford_voodoo {
     ford_gt350_intake intake(
         carburetor_cfm: 845,
         idle_flow_rate_cfm: 1,
-        idle_throttle_plate_position: 0.9834
+        idle_throttle_plate_position: 0.98338
     )
 
     exhaust_system_parameters es0_params(
@@ -445,7 +445,7 @@ public node ford_gt350 {
 		cross_sectional_area: 2.2 * units.m2,
 		diff_ratio: 3.73,
 		tire_radius: 696 * 0.5 * units.mm,
-		rolling_resistance: 2000
+		rolling_resistance: 1200
 		)
 }
 
