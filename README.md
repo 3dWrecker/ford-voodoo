@@ -1,5 +1,5 @@
 # ford-voodoo
-My attempt at a Ford GT350 Voodoo engine for AngeTheGreat's engine sim.
+My attempt at a the flatplane Ford GT350 Voodoo engine for AngeTheGreat's engine sim.
 
 https://youtu.be/R-87Ywrk_8A
 
